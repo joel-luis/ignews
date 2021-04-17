@@ -1,4 +1,3 @@
-/* eslint-disable no-case-declarations */
 /* eslint-disable no-restricted-syntax */
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Readable } from 'stream';
@@ -23,15 +22,15 @@ export const config = {
 };
 
 const relevantEvents = new Set([
-  'customer.subscription.created',
-  'customer.subcription.updated',
+  'checkout.session.completed',
+  'customer.subscription.updated',
   'customer.subscription.deleted',
 ]);
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method === 'POST') {
-    const buf = await buffer(req);
-    const secret = req.headers['stripe-signature'];
+export default async (request: NextApiRequest, response: NextApiResponse) => {
+  if (request.method === 'POST') {
+    const buf = await buffer(request);
+    const secret = request.headers['stripe-signature'];
 
     let event: Stripe.Event;
 
@@ -42,7 +41,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
         process.env.STRIPE_WEBHOOK_SECRET,
       );
     } catch (err) {
-      return res.status(400).send(`Webhook error: ${err.message}`);
+      return response.status(400).send(`Webhook error: ${err.message}`);
     }
 
     const { type } = event;
@@ -50,8 +49,9 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     if (relevantEvents.has(type)) {
       try {
         switch (type) {
-          case 'customer.subcription.updated':
+          case 'customer.subscription.updated':
           case 'customer.subscription.deleted':
+            // eslint-disable-next-line no-case-declarations
             const subscription = event.data.object as Stripe.Subscription;
 
             await saveSubscription(
@@ -62,6 +62,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
             break;
           case 'checkout.session.completed':
+            // eslint-disable-next-line no-case-declarations
             const checkoutSession = event.data
               .object as Stripe.Checkout.Session;
 
@@ -76,13 +77,13 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
             throw new Error('Unhandled event.');
         }
       } catch (err) {
-        return res.json({ error: 'Webhook handler failed.' });
+        return response.json({ error: 'Webhook handler failed.' });
       }
     }
 
-    res.json({ received: true });
+    response.json({ received: true });
   } else {
-    res.setHeader('Allow', 'POST');
-    res.status(405).end('Method not allowed');
+    response.setHeader('Allow', 'POST');
+    response.status(405).end('Method not allowed');
   }
 };
